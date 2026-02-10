@@ -24,7 +24,9 @@
     "type": "logger",
     "id": "otel"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "publishConfig": {
     "access": "public"
   },

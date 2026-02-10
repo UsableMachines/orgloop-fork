@@ -17,10 +17,14 @@
   },
   "orgloop": {
     "type": "connector",
-    "provides": ["source"],
+    "provides": [
+      "source"
+    ],
     "id": "linear"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "publishConfig": {
     "access": "public"
   },

@@ -16,10 +16,14 @@
   },
   "orgloop": {
     "type": "connector",
-    "provides": ["target"],
+    "provides": [
+      "target"
+    ],
     "id": "openclaw"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "publishConfig": {
     "access": "public"
   },

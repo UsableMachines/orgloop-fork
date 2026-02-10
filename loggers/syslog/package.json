@@ -18,7 +18,9 @@
     "type": "logger",
     "id": "syslog"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "publishConfig": {
     "access": "public"
   },

@@ -16,10 +16,14 @@
   },
   "orgloop": {
     "type": "connector",
-    "provides": ["source"],
+    "provides": [
+      "source"
+    ],
     "id": "cron"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "publishConfig": {
     "access": "public"
   },

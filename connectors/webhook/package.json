@@ -16,10 +16,15 @@
   },
   "orgloop": {
     "type": "connector",
-    "provides": ["source", "target"],
+    "provides": [
+      "source",
+      "target"
+    ],
     "id": "webhook"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "publishConfig": {
     "access": "public"
   },

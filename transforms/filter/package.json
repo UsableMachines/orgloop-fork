@@ -18,7 +18,9 @@
     "type": "transform",
     "id": "filter"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "publishConfig": {
     "access": "public"
   },

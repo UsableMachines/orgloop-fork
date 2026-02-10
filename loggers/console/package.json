@@ -18,7 +18,9 @@
     "type": "logger",
     "id": "console"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "publishConfig": {
     "access": "public"
   },

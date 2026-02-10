@@ -15,7 +15,9 @@
     "@orgloop/core": "workspace:*",
     "@orgloop/sdk": "workspace:*"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "publishConfig": {
     "access": "public"
   },
