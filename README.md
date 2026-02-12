@@ -6,9 +6,15 @@
 
 **Organization as Code -- declarative event routing for autonomous AI organizations.**
 
+🧬 OrgLoop is a declarative runtime for autonomous AI organizations. You define event sources, actors, routes, and standard operating procedures in YAML. When a PR merges, a customer emails, or Claude Code stops working, OrgLoop matches the event to a route and wakes the right actor with a focused prompt for exactly what to do.
+
+When that actor finishes, its completion fires an event back into the system, and the loop continues. Events are generated programmatically and flow through deterministic routing, not chat threads. You are not dependent on a heartbeat eventually finding the right state, an Agent remembering to call a tool, nor a patrol coming across something important.
+
+OrgLoop is open-ended and open source. Build your organization with all of your specialized agents: Claude Code implementers, OpenClaw supervisors, Deep Research lone wolves. Connect GitHub, Linear, Gmail, whatever. There are pre-built connectors, and they're easy to contribute. Tune all your business processes, information flows, and event handling in one place.
+
 > You don't need reliable actors if you have a reliable system around them.
 
-AI agents forget, idle, rabbit-hole, drop context. OrgLoop doesn't fix the agents -- it makes the *system* reliable. When a resource changes state, the right actor is woken with the right context. When that actor finishes, its completion is itself an event, routed to the next actor. **The org loops.**
+AI agents forget, idle, rabbit-hole, drop context. OrgLoop doesn't fix the agents -- it makes the *system* reliable. **The org loops.**
 
 ```
 Source -> [Transform] -> Route -> Actor
@@ -139,7 +145,7 @@ loggers:
 
 ## Why OrgLoop
 
-- **Event-driven, not cron-driven** -- actors wake when something happens, not on a timer
+- **Event-driven actor model** -- sources may poll, but actors never do. Actors wake only when a matched event arrives — no timers, no scanning, no idle loops.
 - **Declarative topology** -- your org's wiring lives in version control
 - **Recursive loop** -- actor completion feeds back as events, triggering the next cycle
 - **Pluggable everything** -- swap GitHub for GitLab, OpenClaw for a custom agent
