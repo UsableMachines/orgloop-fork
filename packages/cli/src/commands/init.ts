@@ -25,6 +25,32 @@ const AVAILABLE_CONNECTORS = [
 	'pagerduty',
 ];
 
+/** Map connector short names to npm package names. */
+const CONNECTOR_PACKAGES: Record<string, string> = {
+	github: '@orgloop/connector-github',
+	linear: '@orgloop/connector-linear',
+	openclaw: '@orgloop/connector-openclaw',
+	'claude-code': '@orgloop/connector-claude-code',
+	webhook: '@orgloop/connector-webhook',
+	slack: '@orgloop/connector-webhook',
+	pagerduty: '@orgloop/connector-webhook',
+};
+
+/** Collect npm dependencies needed for a set of connectors. */
+function collectProjectDeps(connectors: string[]): Record<string, string> {
+	const deps: Record<string, string> = {
+		'@orgloop/core': 'latest',
+		'@orgloop/logger-file': 'latest',
+	};
+
+	for (const conn of connectors) {
+		const pkg = CONNECTOR_PACKAGES[conn];
+		if (pkg) deps[pkg] = 'latest';
+	}
+
+	return Object.fromEntries(Object.entries(deps).sort(([a], [b]) => a.localeCompare(b)));
+}
+
 function connectorYaml(name: string, role: 'source' | 'actor'): string {
 	const configs: Record<string, string> = {
 		github: `apiVersion: orgloop/v1alpha1
@@ -347,13 +373,13 @@ async function scaffoldProject(
 	await writeFile(sopPath, generateExampleSop(), 'utf-8');
 	created.push('sops/example.md');
 
-	// Generate package.json for module dependencies
+	// Generate package.json with connector/transform/logger dependencies
 	const packageJsonPath = join(targetDir, 'package.json');
 	if (!(await dirExists(packageJsonPath))) {
 		const packageJson = {
 			private: true,
-			description: 'OrgLoop project dependencies',
-			dependencies: {} as Record<string, string>,
+			description: `OrgLoop project: ${name}`,
+			dependencies: collectProjectDeps(connectors),
 		};
 		await writeFile(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`, 'utf-8');
 		created.push('package.json');
@@ -603,7 +629,7 @@ export function registerInitCommand(program: Command): void {
 				output.blank();
 				output.info(
 					chalk.dim(
-						'Next: run `orgloop add module <name>` to install a workflow module, or `orgloop doctor` to check your environment.',
+						'Next: run `npm install` to install dependencies, then `orgloop doctor` to check your environment.',
 					),
 				);
 			} catch (err) {

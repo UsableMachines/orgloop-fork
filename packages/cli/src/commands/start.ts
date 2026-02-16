@@ -9,11 +9,12 @@ import { fork } from 'node:child_process';
 import { closeSync, openSync, unlinkSync } from 'node:fs';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Command } from 'commander';
 import { loadCliConfig, resolveConfigPath } from '../config.js';
 import * as output from '../output.js';
+import { createProjectImport } from '../project-import.js';
 import { resolveConnectors } from '../resolve-connectors.js';
 import { printDoctorResult, runDoctor } from './doctor.js';
 
@@ -101,6 +102,10 @@ async function runForeground(configPath?: string, force?: boolean): Promise<void
 	output.info('Starting...');
 	output.blank();
 
+	// Derive project directory from config path for package resolution
+	const projectDir = dirname(resolveConfigPath(configPath));
+	const projectImport = createProjectImport(projectDir);
+
 	// Import Runtime from core — this may fail if core isn't built yet
 	let RuntimeClass: typeof import('@orgloop/core').Runtime;
 
@@ -155,11 +160,14 @@ async function runForeground(configPath?: string, force?: boolean): Promise<void
 		return;
 	}
 
-	// Resolve connectors from config
+	// Resolve connectors from config (project-relative resolution)
 	let resolvedSources: Map<string, import('@orgloop/sdk').SourceConnector>;
 	let resolvedActors: Map<string, import('@orgloop/sdk').ActorConnector>;
 	try {
-		const resolved = await resolveConnectors(config);
+		const resolved = await resolveConnectors(
+			config,
+			projectImport as Parameters<typeof resolveConnectors>[1],
+		);
 		resolvedSources = resolved.sources;
 		resolvedActors = resolved.actors;
 	} catch (err) {
@@ -179,12 +187,12 @@ async function runForeground(configPath?: string, force?: boolean): Promise<void
 		// Fall through — runtime will use InMemoryCheckpointStore
 	}
 
-	// Resolve package transforms from config, with config schema validation
+	// Resolve package transforms from config (project-relative), with config schema validation
 	const resolvedTransforms = new Map<string, import('@orgloop/sdk').Transform>();
 	for (const tDef of config.transforms) {
 		if (tDef.type === 'package' && tDef.package) {
 			try {
-				const mod = await import(tDef.package);
+				const mod = await projectImport(tDef.package);
 				if (typeof mod.register === 'function') {
 					const reg = mod.register() as import('@orgloop/sdk').TransformRegistration;
 
@@ -221,11 +229,11 @@ async function runForeground(configPath?: string, force?: boolean): Promise<void
 		}
 	}
 
-	// Resolve loggers from config
+	// Resolve loggers from config (project-relative)
 	const resolvedLoggers = new Map<string, import('@orgloop/sdk').Logger>();
 	for (const loggerDef of config.loggers) {
 		try {
-			const mod = await import(loggerDef.type);
+			const mod = await projectImport(loggerDef.type);
 			if (typeof mod.register === 'function') {
 				const reg = mod.register();
 				resolvedLoggers.set(loggerDef.name, new reg.logger());

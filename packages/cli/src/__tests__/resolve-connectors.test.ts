@@ -123,7 +123,7 @@ describe('resolveConnectors', () => {
 				makeConfig(),
 				importFn as unknown as Parameters<typeof resolveConnectors>[1],
 			),
-		).rejects.toThrow(/pnpm add/);
+		).rejects.toThrow(/npm install/);
 	});
 
 	it('handles config with no sources or actors', async () => {

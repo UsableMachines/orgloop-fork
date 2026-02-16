@@ -10,6 +10,7 @@
  */
 
 import { readFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import type { CredentialValidator, ServiceDetector } from '@orgloop/sdk';
 import chalk from 'chalk';
 import type { Command } from 'commander';
@@ -17,6 +18,7 @@ import yaml from 'js-yaml';
 import { loadCliConfig, resolveConfigPath } from '../config.js';
 import { getEnvVarMeta } from '../env-metadata.js';
 import * as output from '../output.js';
+import { createProjectImport } from '../project-import.js';
 import { type ImportFn, resolveConnectorRegistrations } from '../resolve-connectors.js';
 import { scanEnvVars } from './env.js';
 import { runValidation } from './validate.js';
@@ -230,6 +232,10 @@ export async function runDoctor(configPath: string, importFn?: ImportFn): Promis
 		// will be caught by checkValidation
 	}
 
+	// Default to project-relative import when no importFn provided
+	const resolvedImportFn =
+		importFn ?? (createProjectImport(dirname(configPath)) as unknown as ImportFn);
+
 	// Resolve connector registrations to discover validators and detectors.
 	// This is best-effort — if config loading fails (e.g., missing env vars),
 	// we fall back to the basic presence-check behavior.
@@ -237,7 +243,7 @@ export async function runDoctor(configPath: string, importFn?: ImportFn): Promis
 	let detectors: Map<string, ServiceDetector> | undefined;
 	try {
 		const config = await loadCliConfig({ configPath });
-		const registrations = await resolveConnectorRegistrations(config, importFn);
+		const registrations = await resolveConnectorRegistrations(config, resolvedImportFn);
 
 		// Collect all credential validators from all connector registrations
 		const allValidators = new Map<string, CredentialValidator>();

@@ -6,6 +6,7 @@
  */
 
 import { readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import type { ModuleExpansionContext, ModuleManifest, RouteDefinition } from '@orgloop/sdk';
 import { expandTemplateDeep, moduleManifestSchema } from '@orgloop/sdk';
@@ -32,7 +33,7 @@ export interface ResolvedModule {
  * Resolve a module package to a filesystem path.
  *
  * Supports:
- * - Fully qualified npm packages: `@orgloop/module-engineering` → resolved via Node
+ * - Fully qualified npm packages: `@orgloop/module-engineering` → resolved from project dir
  * - Local paths: `./modules/engineering` or `/absolute/path` → resolved relative to basePath
  *
  * Bare names (e.g. "engineering") are NOT supported — use a fully qualified
@@ -51,19 +52,16 @@ export function resolveModulePath(pkg: string, basePath: string): string {
 		);
 	}
 
-	// npm/workspace package — try to resolve via Node's module resolution
+	// npm package — resolve from the project directory using createRequire
+	const projectRequire = createRequire(join(basePath, 'package.json'));
 	try {
-		const resolved = import.meta.resolve?.(`${pkg}/orgloop-module.yaml`);
-		if (resolved) {
-			// import.meta.resolve returns a file:// URL
-			const filePath = new URL(resolved).pathname;
-			return dirname(filePath);
-		}
+		const resolved = projectRequire.resolve(`${pkg}/orgloop-module.yaml`);
+		return dirname(resolved);
 	} catch {
 		// Fall through
 	}
 
-	// Fallback: node_modules lookup
+	// Fallback: node_modules lookup relative to project dir
 	return resolve(basePath, 'node_modules', pkg);
 }
 

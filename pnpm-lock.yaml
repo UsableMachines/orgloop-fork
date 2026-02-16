@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@orgloop/transform-agent-gate':
+        specifier: workspace:^
+        version: link:transforms/agent-gate
     devDependencies:
       '@biomejs/biome':
         specifier: ^1.9.0
@@ -132,6 +136,34 @@ importers:
 
   packages/cli:
     dependencies:
+      '@orgloop/core':
+        specifier: workspace:*
+        version: link:../core
+      '@orgloop/sdk':
+        specifier: workspace:*
+        version: link:../sdk
+      '@types/js-yaml':
+        specifier: ^4.0.9
+        version: 4.0.9
+      ajv:
+        specifier: ^8.17.0
+        version: 8.17.1
+      chalk:
+        specifier: ^5.4.0
+        version: 5.6.2
+      commander:
+        specifier: ^13.0.0
+        version: 13.1.0
+      inquirer:
+        specifier: ^12.0.0
+        version: 12.11.1(@types/node@25.2.2)
+      js-yaml:
+        specifier: ^4.1.0
+        version: 4.1.1
+      ora:
+        specifier: ^8.1.0
+        version: 8.2.0
+    devDependencies:
       '@orgloop/connector-agent-ctl':
         specifier: workspace:*
         version: link:../../connectors/agent-ctl
@@ -159,9 +191,6 @@ importers:
       '@orgloop/connector-webhook':
         specifier: workspace:*
         version: link:../../connectors/webhook
-      '@orgloop/core':
-        specifier: workspace:*
-        version: link:../core
       '@orgloop/logger-console':
         specifier: workspace:*
         version: link:../../loggers/console
@@ -174,9 +203,9 @@ importers:
       '@orgloop/logger-syslog':
         specifier: workspace:*
         version: link:../../loggers/syslog
-      '@orgloop/sdk':
+      '@orgloop/transform-agent-gate':
         specifier: workspace:*
-        version: link:../sdk
+        version: link:../../transforms/agent-gate
       '@orgloop/transform-dedup':
         specifier: workspace:*
         version: link:../../transforms/dedup
@@ -186,28 +215,6 @@ importers:
       '@orgloop/transform-filter':
         specifier: workspace:*
         version: link:../../transforms/filter
-      '@types/js-yaml':
-        specifier: ^4.0.9
-        version: 4.0.9
-      ajv:
-        specifier: ^8.17.0
-        version: 8.17.1
-      chalk:
-        specifier: ^5.4.0
-        version: 5.6.2
-      commander:
-        specifier: ^13.0.0
-        version: 13.1.0
-      inquirer:
-        specifier: ^12.0.0
-        version: 12.11.1(@types/node@25.2.2)
-      js-yaml:
-        specifier: ^4.1.0
-        version: 4.1.1
-      ora:
-        specifier: ^8.1.0
-        version: 8.2.0
-    devDependencies:
       '@types/inquirer':
         specifier: ^9.0.7
         version: 9.0.9

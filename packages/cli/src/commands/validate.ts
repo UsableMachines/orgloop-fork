@@ -22,6 +22,7 @@ import yaml from 'js-yaml';
 import { resolveConfigPath } from '../config.js';
 import { resolveModules } from '../module-resolver.js';
 import * as output from '../output.js';
+import { createProjectImport } from '../project-import.js';
 import { scanEnvVars } from './env.js';
 
 // ─── Validation result ───────────────────────────────────────────────────────
@@ -194,13 +195,14 @@ async function validateTransformScripts(
 
 async function validateTransformConfigs(
 	transforms: TransformDefinition[],
+	importFn: (specifier: string) => Promise<{ [key: string]: unknown }>,
 ): Promise<ValidationResult[]> {
 	const results: ValidationResult[] = [];
 
 	for (const t of transforms) {
 		if (t.type === 'package' && t.package && t.config) {
 			try {
-				const mod = await import(t.package);
+				const mod = await importFn(t.package);
 				if (typeof mod.register !== 'function') continue;
 
 				const reg = mod.register();
@@ -479,7 +481,8 @@ export async function runValidation(configPath: string): Promise<{
 	results.push(...scriptResults);
 
 	// 4b. Validate package transform configs against their schemas
-	const configResults = await validateTransformConfigs([...transforms.values()]);
+	const projectImport = createProjectImport(basePath);
+	const configResults = await validateTransformConfigs([...transforms.values()], projectImport);
 	results.push(...configResults);
 
 	// 5. Load and validate logger files

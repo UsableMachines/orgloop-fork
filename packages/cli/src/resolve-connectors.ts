@@ -3,6 +3,9 @@
  *
  * Dynamically imports connector packages referenced in config,
  * instantiates source/actor connectors, and returns Maps keyed by ID.
+ *
+ * Packages are resolved from the project directory's node_modules,
+ * not the CLI's install location.
  */
 
 import type {
@@ -25,7 +28,7 @@ export type ImportFn = (specifier: string) => Promise<{ default: () => Connector
  */
 export async function resolveConnectors(
 	config: OrgLoopConfig,
-	importFn: ImportFn = (s) => import(s),
+	importFn: ImportFn,
 ): Promise<ResolvedConnectors> {
 	const sources = new Map<string, SourceConnector>();
 	const actors = new Map<string, ActorConnector>();
@@ -52,7 +55,7 @@ export async function resolveConnectors(
 			const msg = err instanceof Error ? err.message : String(err);
 			throw new Error(
 				`Failed to import connector "${packageName}": ${msg}\n` +
-					`  Hint: run \`pnpm add ${packageName}\` to install it.`,
+					`  Hint: run \`npm install ${packageName}\` in your project directory.`,
 			);
 		}
 
@@ -107,7 +110,7 @@ export async function resolveConnectors(
  */
 export async function resolveConnectorRegistrations(
 	config: OrgLoopConfig,
-	importFn: ImportFn = (s) => import(s),
+	importFn: ImportFn,
 ): Promise<Map<string, ConnectorRegistration>> {
 	const registrations = new Map<string, ConnectorRegistration>();
 
