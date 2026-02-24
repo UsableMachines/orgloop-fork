@@ -1066,7 +1066,9 @@ describe('GitHubSource', () => {
 
 			// Should have returned the issue comment events collected before the error
 			expect(result.events.length).toBeGreaterThanOrEqual(1);
-			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('[github] Failed to poll closed PRs'));
+			expect(consoleSpy).toHaveBeenCalledWith(
+				expect.stringContaining('[github] Failed to poll closed PRs'),
+			);
 			consoleSpy.mockRestore();
 		});
 
