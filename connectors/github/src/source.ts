@@ -39,6 +39,28 @@ function resolveEnvVar(value: string): string {
 	return value;
 }
 
+/**
+ * Run a shell command and return its stdout, trimmed.
+ * Used for `token_command` to get fresh tokens on each poll.
+ */
+async function execTokenCommand(command: string): Promise<string> {
+	const { execFile } = await import('node:child_process');
+	const { promisify } = await import('node:util');
+	const execFileAsync = promisify(execFile);
+
+	// Use shell execution to support pipes, env vars, etc.
+	const { stdout } = await execFileAsync('/bin/sh', ['-c', command], {
+		timeout: 10_000,
+		env: process.env,
+	});
+
+	const token = stdout.trim();
+	if (!token) {
+		throw new Error(`token_command returned empty output: ${command}`);
+	}
+	return token;
+}
+
 /** Default lookback window for initial sync (no checkpoint) */
 const DEFAULT_INITIAL_LOOKBACK = '7d';
 
@@ -59,6 +81,15 @@ interface GitHubSourceConfig {
 	events: string[];
 	authors?: string[];
 	token: string;
+	/**
+	 * Shell command that outputs a fresh token to stdout.
+	 * When set, this is called on each poll to get the current token,
+	 * solving the stale process.env problem with rotated GitHub App
+	 * installation tokens. Falls back to `token` on command failure.
+	 *
+	 * Example: token_command: "/path/to/get-token.sh"
+	 */
+	token_command?: string;
 	/** How far back to look on initial sync (e.g. "7d", "24h"). Default: 7d */
 	initial_lookback?: string;
 	/** Max percentage of remaining rate limit to use per poll (0-1). Default: 0.8 */
@@ -102,6 +133,7 @@ export class GitHubSource implements SourceConnector {
 	// so we can re-resolve the env var on each poll and detect changes.
 	private rawTokenConfig = '';
 	private resolvedToken = '';
+	private tokenCommand: string | null = null;
 
 	async init(config: SourceConfig): Promise<void> {
 		const cfg = config.config as unknown as GitHubSourceConfig;
@@ -121,13 +153,19 @@ export class GitHubSource implements SourceConnector {
 		}
 
 		this.rawTokenConfig = cfg.token;
+		this.tokenCommand = cfg.token_command ?? null;
 		this.resolvedToken = resolveEnvVar(cfg.token);
 		this.octokit = new Octokit({ auth: this.resolvedToken });
 	}
 
 	/**
-	 * Re-resolve the token from env vars. If the token changed
-	 * (e.g. rotated by an external refresh script), recreate the Octokit client.
+	 * Re-resolve the token. If the token changed (e.g. rotated by an external
+	 * refresh script), recreate the Octokit client.
+	 *
+	 * Resolution order:
+	 * 1. If `token_command` is configured, run it to get a fresh token
+	 * 2. Otherwise, re-resolve the env var from process.env
+	 *
 	 * Returns true if the token was refreshed.
 	 */
 	private refreshTokenIfChanged(): boolean {
@@ -145,6 +183,39 @@ export class GitHubSource implements SourceConnector {
 		return false;
 	}
 
+	/**
+	 * Async token refresh: runs `token_command` if configured to get a fresh
+	 * token. This solves the stale process.env problem — GitHub App installation
+	 * tokens (ghs_*) expire after 1 hour, but process.env is a snapshot from
+	 * launch time and doesn't reflect .env file updates.
+	 *
+	 * Falls back to the sync refreshTokenIfChanged() if no command is configured
+	 * or if the command fails.
+	 */
+	private async refreshTokenAsync(): Promise<boolean> {
+		if (!this.tokenCommand) {
+			return this.refreshTokenIfChanged();
+		}
+
+		try {
+			const freshToken = await execTokenCommand(this.tokenCommand);
+			if (freshToken !== this.resolvedToken) {
+				console.log('[github] Token refreshed via token_command');
+				this.resolvedToken = freshToken;
+				this.octokit = new Octokit({ auth: freshToken });
+				return true;
+			}
+		} catch (err) {
+			console.warn(
+				`[github] token_command failed, falling back to env var: ${err instanceof Error ? err.message : String(err)}`,
+			);
+			// Fall back to sync env var check
+			return this.refreshTokenIfChanged();
+		}
+
+		return false;
+	}
+
 	async poll(checkpoint: string | null): Promise<PollResult> {
 		// Apply initial lookback window when no checkpoint exists or checkpoint is epoch
 		const isEpochCheckpoint = checkpoint != null && checkpoint <= EPOCH_THRESHOLD;
@@ -155,8 +226,9 @@ export class GitHubSource implements SourceConnector {
 		const events: OrgLoopEvent[] = [];
 		let latestTimestamp = since;
 
-		// Proactively check if the token has been rotated (e.g. by a refresh script)
-		this.refreshTokenIfChanged();
+		// Proactively refresh the token (runs token_command if configured,
+		// otherwise falls back to process.env check)
+		await this.refreshTokenAsync();
 
 		// Reset per-poll budget tracking
 		this.pollBudget = {
@@ -279,8 +351,9 @@ export class GitHubSource implements SourceConnector {
 				};
 			}
 			if (error.status === 401 || (error.status === 403 && !this.isRateLimited())) {
-				// Token may have expired — try refreshing from env vars
-				if (this.refreshTokenIfChanged()) {
+				// Token may have expired — try refreshing
+				const refreshed = await this.refreshTokenAsync();
+				if (refreshed) {
 					console.log('[github] Token refreshed after auth error, will retry on next poll');
 				} else {
 					console.error(`[github] Auth error (token unchanged): ${error.message}`);

@@ -1302,6 +1302,123 @@ describe('GitHubSource', () => {
 		});
 	});
 
+	describe('token_command refresh', () => {
+		it('uses token_command to get fresh token on each poll', async () => {
+			const source = new GitHubSource();
+			process.env.GITHUB_TOKEN = 'initial-token';
+			await source.init({
+				id: 'github-test',
+				connector: 'github',
+				config: {
+					repo: 'owner/repo',
+					events: ['pull_request.review_submitted'],
+					token: '${GITHUB_TOKEN}',
+					token_command: 'echo fresh-token-123',
+				},
+			});
+
+			// Verify init used the env var token
+			expect((source as unknown as Record<string, string>).resolvedToken).toBe('initial-token');
+
+			// Now set up mock AFTER init but BEFORE poll (poll triggers refreshTokenAsync)
+			const mock = createMockOctokit();
+			const pr = makePR();
+			const review = makeReview({ submitted_at: '2024-01-15T10:00:00Z' });
+			mock.pulls.list.mockResolvedValue({ data: [pr] });
+			mock.pulls.listReviews.mockResolvedValue({ data: [review] });
+
+			// refreshTokenAsync will run token_command, get fresh token, and recreate octokit.
+			// We need to intercept the new octokit. Spy on the Octokit constructor behavior
+			// by checking the token was updated after poll.
+			const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+			// Replace octokit AFTER the refresh happens by patching the setter
+			// Actually, simpler: just verify the token changed
+			// The poll will fail (real octokit with fake token), but we can verify token refresh
+			try {
+				await source.poll('2024-01-15T09:00:00Z');
+			} catch {
+				// Expected: real Octokit with fake 'fresh-token-123' will fail on API call
+			}
+
+			// Token should have been refreshed via command
+			expect((source as unknown as Record<string, string>).resolvedToken).toBe('fresh-token-123');
+			expect(consoleSpy).toHaveBeenCalledWith(
+				expect.stringContaining('Token refreshed via token_command'),
+			);
+			consoleSpy.mockRestore();
+		});
+
+		it('falls back to env var when token_command fails', async () => {
+			const mock = createMockOctokit();
+			const pr = makePR();
+			const review = makeReview({ submitted_at: '2024-01-15T10:00:00Z' });
+
+			mock.pulls.list.mockResolvedValue({ data: [pr] });
+			mock.pulls.listReviews.mockResolvedValue({ data: [review] });
+
+			const source = new GitHubSource();
+			process.env.GITHUB_TOKEN = 'env-token';
+			await source.init({
+				id: 'github-test',
+				connector: 'github',
+				config: {
+					repo: 'owner/repo',
+					events: ['pull_request.review_submitted'],
+					token: '${GITHUB_TOKEN}',
+					token_command: 'exit 1',
+				},
+			});
+			(source as unknown as Record<string, unknown>).octokit = mock;
+
+			const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+			const result = await source.poll('2024-01-15T09:00:00Z');
+
+			expect(result.events).toHaveLength(1);
+			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('token_command failed'));
+			consoleSpy.mockRestore();
+		});
+
+		it('refreshes token on 401 error via token_command', async () => {
+			const mock = createMockOctokit();
+			const authError = Object.assign(new Error('Bad credentials'), { status: 401 });
+
+			mock.paginate.iterator.mockReturnValue({
+				// biome-ignore lint/correctness/useYield: mock iterator that throws before yielding
+				async *[Symbol.asyncIterator]() {
+					throw authError;
+				},
+			});
+
+			const source = new GitHubSource();
+			process.env.GITHUB_TOKEN = 'expired-token';
+			await source.init({
+				id: 'github-test',
+				connector: 'github',
+				config: {
+					repo: 'owner/repo',
+					events: ['pull_request.review_submitted'],
+					token: '${GITHUB_TOKEN}',
+					token_command: 'echo refreshed-token-456',
+				},
+			});
+			(source as unknown as Record<string, unknown>).octokit = mock;
+
+			const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+			const result = await source.poll('2024-01-15T09:00:00Z');
+
+			// Should return empty (error caught) but token should be refreshed
+			expect(result.events).toHaveLength(0);
+			expect((source as unknown as Record<string, string>).resolvedToken).toBe(
+				'refreshed-token-456',
+			);
+			expect(consoleSpy).toHaveBeenCalledWith(
+				expect.stringContaining('Token refreshed via token_command'),
+			);
+			consoleSpy.mockRestore();
+		});
+	});
+
 	describe('shutdown', () => {
 		it('completes without error', async () => {
 			const source = new GitHubSource();
